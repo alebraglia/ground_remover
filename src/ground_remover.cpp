@@ -7,12 +7,12 @@ GroundRemover::GroundRemover()
   RCLCPP_INFO(this->get_logger(), "Ground_remover node has started.");
 
   // parametri default
-  this->declare_parameter("distance_threshold", 0.2);
-  this->declare_parameter("max_iterations", 500);
+  this->declare_parameter("distance_threshold", 0.04);
+  this->declare_parameter("max_iterations", 200);
 
   // Inizializzazione subscriber e publisher
   subscription_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    "/lidar_points", 10, std::bind(&GroundRemover::filter, this, std::placeholders::_1));
+      "/lidar_points", 10, std::bind(&GroundRemover::filter, this, std::placeholders::_1));
 
   publisher_ground_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/ground", 10);
   publisher_non_ground_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/not_ground", 10);
@@ -23,6 +23,12 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   // Convertire da PointCloud2 a PCL
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*msg, *cloud);
+
+  pcl::PassThrough<pcl::PointXYZ> pass;
+  pass.setInputCloud(cloud);
+  pass.setFilterFieldName("z");    // dipende da come è orientata la tua nuvola
+  pass.setFilterLimits(-0.7,0.7); // Limita la zona in cui si cerca il piano
+  pass.filter(*cloud);
 
   // Parametri di segmentazione
   this->get_parameter("distance_threshold", distance_threshold_);
@@ -36,14 +42,15 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   seg.setDistanceThreshold(distance_threshold_);
   seg.setMaxIterations(max_iterations_);
 
-   // Segmentazione del piano
-   pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
-   pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
-   seg.setInputCloud(cloud);
-   seg.segment(*inliers, *coefficients);
+  // Segmentazione del piano
+  pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+  pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+  seg.setInputCloud(cloud);
+  seg.segment(*inliers, *coefficients);
 
-   // Controllo se sono stati trovati inliers
-   if (inliers->indices.empty()) {
+  // Controllo se sono stati trovati inliers
+  if (inliers->indices.empty())
+  {
     RCLCPP_WARN(this->get_logger(), "Nessun piano trovato!");
     return;
   }
@@ -55,7 +62,7 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr ground_cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::PointCloud<pcl::PointXYZ>::Ptr non_ground_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  
+
   extract.setNegative(false);
   extract.filter(*ground_cloud);
   extract.setNegative(true);
@@ -66,10 +73,10 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   sensor_msgs::msg::PointCloud2 non_ground_msg;
   pcl::toROSMsg(*ground_cloud, ground_msg);
   pcl::toROSMsg(*non_ground_cloud, non_ground_msg);
-  
+
   ground_msg.header = msg->header;
   non_ground_msg.header = msg->header;
-  
+
   publisher_ground_->publish(ground_msg);
   publisher_non_ground_->publish(non_ground_msg);
 }
