@@ -46,7 +46,7 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>());
   normal.setSearchMethod(tree);
   // normal.setRadiusSearch(0.05); // raggio di ricerca per le normali
-  normal.setKSearch(20);        // numero di vicini per calcolare la normale
+  normal.setKSearch(10);        // numero di vicini per calcolare la normale
   pcl::PointCloud<pcl::Normal>::Ptr cloud_normals(new pcl::PointCloud<pcl::Normal>);
   normal.compute(*cloud_normals);
 
