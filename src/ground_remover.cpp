@@ -1,6 +1,7 @@
 #include "ground_remover.hpp"
 #include <iostream>
 #include <pcl/filters/passthrough.h>
+// #include <pcl/features/normal_3d_omp.h> calcolo delle normali in parallelo
 
 GroundRemover::GroundRemover()
     : Node("ground_remover")
@@ -40,6 +41,10 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 
   RCLCPP_INFO(this->get_logger(), "Numero di punti nella nuvola: %zu", cloud->points.size());
 
+  // calcolo delle normali con più thread
+  // pcl::NormalEstimationOMP<pcl::PointXYZ, pcl::Normal> normal;
+  // normal.setNumberOfThreads(4); // numero di thread per il calcolo delle normali
+  
   //calcolo delle normali
   pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> normal;
   normal.setInputCloud(cloud);
