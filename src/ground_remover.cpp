@@ -12,7 +12,7 @@ GroundRemover::GroundRemover()
 
   // Inizializzazione subscriber e publisher
   subscription_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    "/clusters", 10, std::bind(&GroundRemover::filter, this, std::placeholders::_1));
+    "/lidar_points", 10, std::bind(&GroundRemover::filter, this, std::placeholders::_1));
 
   publisher_ground_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/ground", 10);
   publisher_non_ground_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/not_ground", 10);
