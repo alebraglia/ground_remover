@@ -1,4 +1,5 @@
 #include "ground_remover.hpp"
+#include <iostream>
 
 GroundRemover::GroundRemover()
     : Node("ground_remover")
@@ -7,12 +8,12 @@ GroundRemover::GroundRemover()
   RCLCPP_INFO(this->get_logger(), "Ground_remover node has started.");
 
   // parametri default
-  this->declare_parameter("distance_threshold", 0.2);
-  this->declare_parameter("max_iterations", 500);
+  this->declare_parameter("distance_threshold", 0.1);
+  this->declare_parameter("max_iterations", 100);
 
   // Inizializzazione subscriber e publisher
   subscription_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    "/clusters", 10, std::bind(&GroundRemover::filter, this, std::placeholders::_1));
+      "/lidar_points", 10, std::bind(&GroundRemover::filter, this, std::placeholders::_1));
 
   publisher_ground_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/ground", 10);
   publisher_non_ground_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/not_ground", 10);
@@ -24,26 +25,57 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*msg, *cloud);
 
+  /* filtro i punti che sono altezza pavimento
+  pcl::PassThrough<pcl::PointXYZ> pass;
+  pass.setInputCloud(cloud);
+  pass.setFilterFieldName("z");
+  pass.setFilterLimits(-0.2, 0.4);
+  pass.filter(*cloud);
+  */
+
   // Parametri di segmentazione
   this->get_parameter("distance_threshold", distance_threshold_);
   this->get_parameter("max_iterations", max_iterations_);
 
+  std::cout << "arriavto calcolo normali"<< std::endl;
+
+  RCLCPP_INFO(this->get_logger(), "Numero di punti nella nuvola: %zu", cloud->points.size());
+
+  //calcolo delle normali
+  pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> normal;
+  normal.setInputCloud(cloud);
+  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>());
+  normal.setSearchMethod(tree);
+  normal.setRadiusSearch(0.05); // raggio di ricerca per le normali
+  // normal.setKSearch(10);        // numero di vicini per calcolare la normale
+  pcl::PointCloud<pcl::Normal>::Ptr cloud_normals(new pcl::PointCloud<pcl::Normal>);
+  normal.compute(*cloud_normals);
+
+  std::cout << "arrivato seg" << std::endl;
+
   // creazione dell'oggetto per la segmentazione
-  pcl::SACSegmentation<pcl::PointXYZ> seg;
+  pcl::SACSegmentationFromNormals<pcl::PointXYZ,pcl::Normal> seg;
   seg.setOptimizeCoefficients(true);
-  seg.setModelType(pcl::SACMODEL_PLANE);
+  seg.setModelType(pcl::SACMODEL_NORMAL_PLANE);
   seg.setMethodType(pcl::SAC_RANSAC);
   seg.setDistanceThreshold(distance_threshold_);
   seg.setMaxIterations(max_iterations_);
+  seg.setNormalDistanceWeight(0.1); // peso della normale
+  seg.setInputCloud(cloud);
+  seg.setInputNormals(cloud_normals);
 
-   // Segmentazione del piano
-   pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
-   pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
-   seg.setInputCloud(cloud);
-   seg.segment(*inliers, *coefficients);
+  std::cout << "uscito seg" << std::endl;
 
-   // Controllo se sono stati trovati inliers
-   if (inliers->indices.empty()) {
+  // Segmentazione del piano
+  pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+  pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+  seg.segment(*inliers, *coefficients);
+
+  std::cout << "finito seg" << std::endl;
+
+  // Controllo se sono stati trovati inliers
+  if (inliers->indices.empty())
+  {
     RCLCPP_WARN(this->get_logger(), "Nessun piano trovato!");
     return;
   }
@@ -55,7 +87,8 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr ground_cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::PointCloud<pcl::PointXYZ>::Ptr non_ground_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  
+
+  // Estrazione del piano e del landscape
   extract.setNegative(false);
   extract.filter(*ground_cloud);
   extract.setNegative(true);
@@ -66,10 +99,10 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   sensor_msgs::msg::PointCloud2 non_ground_msg;
   pcl::toROSMsg(*ground_cloud, ground_msg);
   pcl::toROSMsg(*non_ground_cloud, non_ground_msg);
-  
+
   ground_msg.header = msg->header;
   non_ground_msg.header = msg->header;
-  
+
   publisher_ground_->publish(ground_msg);
   publisher_non_ground_->publish(non_ground_msg);
 }

@@ -8,6 +8,9 @@
 #include <pcl/filters/extract_indices.h>
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <pcl/filters/passthrough.h>
+#include <pcl/features/normal_3d.h>
+
 
 class GroundRemover : public rclcpp::Node
 {
