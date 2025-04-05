@@ -7,8 +7,8 @@ GroundRemover::GroundRemover()
   RCLCPP_INFO(this->get_logger(), "Ground_remover node has started.");
 
   // parametri default
-  this->declare_parameter("distance_threshold", 0.04);
-  this->declare_parameter("max_iterations", 200);
+  this->declare_parameter("distance_threshold", 0.05);
+  this->declare_parameter("max_iterations", 100);
 
   // Inizializzazione subscriber e publisher
   subscription_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -27,7 +27,7 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   pcl::PassThrough<pcl::PointXYZ> pass;
   pass.setInputCloud(cloud);
   pass.setFilterFieldName("z");    // dipende da come è orientata la tua nuvola
-  pass.setFilterLimits(-0.7,0.7); // Limita la zona in cui si cerca il piano
+  pass.setFilterLimits(-0.9,0.9); // Limita la zona in cui si cerca il piano
   pass.filter(*cloud);
 
   // Parametri di segmentazione
