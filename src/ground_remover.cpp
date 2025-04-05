@@ -1,5 +1,6 @@
 #include "ground_remover.hpp"
 #include <iostream>
+#include <pcl/filters/passthrough.h>
 
 GroundRemover::GroundRemover()
     : Node("ground_remover")
@@ -8,8 +9,8 @@ GroundRemover::GroundRemover()
   RCLCPP_INFO(this->get_logger(), "Ground_remover node has started.");
 
   // parametri default
-  this->declare_parameter("distance_threshold", 0.1);
-  this->declare_parameter("max_iterations", 100);
+  this->declare_parameter("distance_threshold", 0.05);
+  this->declare_parameter("max_iterations", 50);
 
   // Inizializzazione subscriber e publisher
   subscription_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -25,19 +26,17 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*msg, *cloud);
 
-  /* filtro i punti che sono altezza pavimento
+  // filtro i punti che sono altezza pavimento per ridurre tempo calcolo normali
   pcl::PassThrough<pcl::PointXYZ> pass;
   pass.setInputCloud(cloud);
   pass.setFilterFieldName("z");
-  pass.setFilterLimits(-0.2, 0.4);
+  pass.setFilterLimits(-0.5, 0.3); 
   pass.filter(*cloud);
-  */
+  
 
   // Parametri di segmentazione
   this->get_parameter("distance_threshold", distance_threshold_);
   this->get_parameter("max_iterations", max_iterations_);
-
-  std::cout << "arriavto calcolo normali"<< std::endl;
 
   RCLCPP_INFO(this->get_logger(), "Numero di punti nella nuvola: %zu", cloud->points.size());
 
@@ -46,12 +45,10 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   normal.setInputCloud(cloud);
   pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>());
   normal.setSearchMethod(tree);
-  normal.setRadiusSearch(0.05); // raggio di ricerca per le normali
-  // normal.setKSearch(10);        // numero di vicini per calcolare la normale
+  // normal.setRadiusSearch(0.05); // raggio di ricerca per le normali
+  normal.setKSearch(20);        // numero di vicini per calcolare la normale
   pcl::PointCloud<pcl::Normal>::Ptr cloud_normals(new pcl::PointCloud<pcl::Normal>);
   normal.compute(*cloud_normals);
-
-  std::cout << "arrivato seg" << std::endl;
 
   // creazione dell'oggetto per la segmentazione
   pcl::SACSegmentationFromNormals<pcl::PointXYZ,pcl::Normal> seg;
@@ -64,14 +61,10 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   seg.setInputCloud(cloud);
   seg.setInputNormals(cloud_normals);
 
-  std::cout << "uscito seg" << std::endl;
-
   // Segmentazione del piano
   pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
   pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
   seg.segment(*inliers, *coefficients);
-
-  std::cout << "finito seg" << std::endl;
 
   // Controllo se sono stati trovati inliers
   if (inliers->indices.empty())
