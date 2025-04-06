@@ -23,13 +23,19 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   // Convertire da PointCloud2 a PCL
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*msg, *cloud);
-
+  
   // filtrare la nuvola di punti a livello pavimento
   pcl::PassThrough<pcl::PointXYZ> pass;
   pass.setInputCloud(cloud);
   pass.setFilterFieldName("z");    // dipende da come è orientata la tua nuvola
-  pass.setFilterLimits(-0.9,0.9); // Limita la zona in cui si cerca il piano
+  pass.setFilterLimits(-1.0,1.5); // Limita la zona in cui si cerca il piano
   pass.filter(*cloud);
+  
+  // ridurre la densità della nuvola di punti
+  pcl::VoxelGrid<pcl::PointXYZ> vg;
+  vg.setInputCloud(cloud);
+  vg.setLeafSize(0.05f, 0.05f, 0.05f); // Riduce la densità della nuvola di punti
+  vg.filter(*cloud);
 
   // Parametri di segmentazione
   this->get_parameter("distance_threshold", distance_threshold_);
