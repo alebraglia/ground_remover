@@ -1,7 +1,7 @@
 #include "ground_remover.hpp"
 #include <iostream>
 #include <pcl/filters/passthrough.h>
-// #include <pcl/features/normal_3d_omp.h> calcolo delle normali in parallelo
+#include <pcl/features/normal_3d_omp.h> 
 
 GroundRemover::GroundRemover()
     : Node("ground_remover")
@@ -10,8 +10,8 @@ GroundRemover::GroundRemover()
   RCLCPP_INFO(this->get_logger(), "Ground_remover node has started.");
 
   // parametri default
-  this->declare_parameter("distance_threshold", 0.05);
-  this->declare_parameter("max_iterations", 50);
+  this->declare_parameter("distance_threshold", 0.07);
+  this->declare_parameter("max_iterations", 100);
 
   // Inizializzazione subscriber e publisher
   subscription_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -31,7 +31,7 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   pcl::PassThrough<pcl::PointXYZ> pass;
   pass.setInputCloud(cloud);
   pass.setFilterFieldName("z");
-  pass.setFilterLimits(-0.5, 0.3); 
+  pass.setFilterLimits(-0.5, 0.4); 
   pass.filter(*cloud);
   
 
@@ -41,17 +41,17 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 
   RCLCPP_INFO(this->get_logger(), "Numero di punti nella nuvola: %zu", cloud->points.size());
 
-  // calcolo delle normali con più thread
-  // pcl::NormalEstimationOMP<pcl::PointXYZ, pcl::Normal> normal;
-  // normal.setNumberOfThreads(4); // numero di thread per il calcolo delle normali
+  // calcolo delle normali senza thread aggiuntivi
+  // pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> normal;
   
   //calcolo delle normali
-  pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> normal;
+  pcl::NormalEstimationOMP<pcl::PointXYZ, pcl::Normal> normal;
+  normal.setNumberOfThreads(4); // numero di thread per il calcolo delle normali
   normal.setInputCloud(cloud);
   pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>());
   normal.setSearchMethod(tree);
-  // normal.setRadiusSearch(0.05); // raggio di ricerca per le normali
-  normal.setKSearch(10);        // numero di vicini per calcolare la normale
+  //normal.setRadiusSearch(0.05); // raggio di ricerca per le normali
+  normal.setKSearch(30);        // numero di vicini per calcolare la normale
   pcl::PointCloud<pcl::Normal>::Ptr cloud_normals(new pcl::PointCloud<pcl::Normal>);
   normal.compute(*cloud_normals);
 
