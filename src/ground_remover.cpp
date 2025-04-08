@@ -58,7 +58,7 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   // Controllo se sono stati trovati inliers
   if (inliers->indices.empty())
   {
-    RCLCPP_WARN(this->get_logger(), "Nessun piano trovato!");
+    RCLCPP_WARN(this->get_logger(), "Errore durante segmentazione!");
     return;
   }
 
