@@ -1,5 +1,8 @@
 #include "ground_remover.hpp"
 
+#include <iostream>
+#include <chrono>
+
 GroundRemover::GroundRemover()
     : Node("ground_remover")
 {
@@ -8,7 +11,7 @@ GroundRemover::GroundRemover()
 
   // parametri default
   this->declare_parameter("distance_threshold", 0.05);
-  this->declare_parameter("max_iterations", 100);
+  this->declare_parameter("max_iterations", 30);
 
   // Inizializzazione subscriber e publisher
   subscription_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -28,14 +31,22 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   pcl::PassThrough<pcl::PointXYZ> pass;
   pass.setInputCloud(cloud);
   pass.setFilterFieldName("z");    // dipende da come è orientata la tua nuvola
-  pass.setFilterLimits(-1.0,1.5); // Limita la zona in cui si cerca il piano
+  pass.setFilterLimits(-0.5,0.25); // Limita la zona in cui si cerca il piano
   pass.filter(*cloud);
   
   // ridurre la densità della nuvola di punti
+  // ci mette uno sfracasso di tempo
+  /*auto start = std::chrono::high_resolution_clock::now();
+
   pcl::VoxelGrid<pcl::PointXYZ> vg;
   vg.setInputCloud(cloud);
   vg.setLeafSize(0.05f, 0.05f, 0.05f); // Riduce la densità della nuvola di punti
   vg.filter(*cloud);
+
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+  std::cout << "Tempo di esecuzione: " << duration.count() << " microsecondi" << std::endl;*/
+
 
   // Parametri di segmentazione
   this->get_parameter("distance_threshold", distance_threshold_);
