@@ -12,6 +12,8 @@ GroundRemover::GroundRemover()
   // parametri default
   this->declare_parameter("distance_threshold", 0.05);
   this->declare_parameter("max_iterations", 30);
+  this->declare_parameter("min_filter", -0.5);
+  this->declare_parameter("max_filter", 0.35);
 
   // Inizializzazione subscriber e publisher
   subscription_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -23,15 +25,24 @@ GroundRemover::GroundRemover()
 
 void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
+  // tempo di esecuzione
+  auto start = std::chrono::high_resolution_clock::now();
+  
   // Convertire da PointCloud2 a PCL
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*msg, *cloud);
+  
+  // Parametri di segmentazione
+  this->get_parameter("distance_threshold", distance_threshold_);
+  this->get_parameter("max_iterations", max_iterations_);
+  this->get_parameter("min_filter", min_filter_);
+  this->get_parameter("max_filter", max_filter_);
   
   // filtrare la nuvola di punti a livello pavimento
   pcl::PassThrough<pcl::PointXYZ> pass;
   pass.setInputCloud(cloud);
   pass.setFilterFieldName("z");    // dipende da come è orientata la tua nuvola
-  pass.setFilterLimits(-0.5,0.25); // Limita la zona in cui si cerca il piano
+  pass.setFilterLimits(min_filter_, max_filter_); // Limita la zona in cui si cerca il piano
   pass.filter(*cloud);
   
   // ridurre la densità della nuvola di punti
@@ -46,11 +57,6 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   auto end = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
   std::cout << "Tempo di esecuzione: " << duration.count() << " microsecondi" << std::endl;*/
-
-
-  // Parametri di segmentazione
-  this->get_parameter("distance_threshold", distance_threshold_);
-  this->get_parameter("max_iterations", max_iterations_);
 
   // creazione dell'oggetto per la segmentazione
   pcl::SACSegmentation<pcl::PointXYZ> seg;
@@ -97,6 +103,12 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 
   publisher_ground_->publish(ground_msg);
   publisher_non_ground_->publish(non_ground_msg);
+
+  // Calcolo del tempo di esecuzione
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  std::cout << "Tempo di esecuzione: " << duration.count() << " milisecondi" << std::endl;
+
 }
 
 int main(int argc, char **argv)

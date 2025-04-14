@@ -26,7 +26,7 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr publisher_non_ground_;
   
   // Parametri per la segmentazione (configurabili in modo dinamico)
-  double distance_threshold_;
+  double distance_threshold_, min_filter_, max_filter_;
   int max_iterations_;
 };
 
