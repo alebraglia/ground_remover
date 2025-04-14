@@ -20,7 +20,6 @@ GroundRemover::GroundRemover()
       "/lidar_points", 10, std::bind(&GroundRemover::filter, this, std::placeholders::_1));
 
   publisher_ground_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/ground", 10);
-  publisher_non_ground_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/not_ground", 10);
 }
 
 void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
@@ -85,24 +84,21 @@ void GroundRemover::filter(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   extract.setIndices(inliers);
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr ground_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::PointCloud<pcl::PointXYZ>::Ptr non_ground_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+
 
   extract.setNegative(false);
   extract.filter(*ground_cloud);
-  extract.setNegative(true);
-  extract.filter(*non_ground_cloud);
 
   // Convertire da PCL a PointCloud2 e pubblicare
   sensor_msgs::msg::PointCloud2 ground_msg;
-  sensor_msgs::msg::PointCloud2 non_ground_msg;
+
   pcl::toROSMsg(*ground_cloud, ground_msg);
-  pcl::toROSMsg(*non_ground_cloud, non_ground_msg);
+
 
   ground_msg.header = msg->header;
-  non_ground_msg.header = msg->header;
 
   publisher_ground_->publish(ground_msg);
-  publisher_non_ground_->publish(non_ground_msg);
+
 
   // Calcolo del tempo di esecuzione
   auto end = std::chrono::high_resolution_clock::now();

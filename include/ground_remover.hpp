@@ -23,7 +23,6 @@ private:
   // Subscriber e publisher
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subscription_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr publisher_ground_;
-  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr publisher_non_ground_;
   
   // Parametri per la segmentazione (configurabili in modo dinamico)
   double distance_threshold_, min_filter_, max_filter_;
